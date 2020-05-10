@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+
+{% block title %}
+		{{book.title}}
+{% endblock %}
+
+{% block body %}
+	<div class="row">
+		<div class="col-xs-12 col-md-4">
+			<h1> {{book.title}}</h1>
+		<ul>
+			<li>ISBN : {{book.isbn}}</li>
+			<li>Author : {{book.author}}</li>
+			<li>Year : {{book.year}}</li>
+			{% if goodreads %}
+			<li> Goodreads Rating: {{goodreads.average_rating}}</li>
+			<li> Goodreads Number of Rating: {{goodreads.work_rating_count}}</li>
+			{% endif %}
+	        </ul>
+		</div>		
+		<div class="col-xs-12 col-md-4">
+		<h1>Reviews</h1>
+			{% if review %}
+		<ol>
+			{% for reviews in review %}
+			<li>
+				<ul>
+					<li>{{user}} rates it at {{reviews.rating}}</li>
+					<li>{{user}} writes - {{reviews.review}}</li>
+				</ul>
+			</li>
+			{% endfor %}
+		</ol>
+	{% endif %}
+		</div>
+	</div>
+	<div class = "row">
+		Rate this book:
+		<br>
+		<form action="{{ url_for('review', book_id=book.id)}}" method="post">
+			<div class="form-group">
+				<label for="rating">Rating</label>
+				<select class="form-control" id="rating" name="rate">
+					<option>1</option>
+					<option>2</option>
+					<option>3</option>
+					<option>4</option>
+					<option>5</option>
+				</select>
+			</div>
+			<div class="form-group">
+				<label for="review">Review</label>
+				<textarea class="form-control" id="review" rows="4" name="review"></textarea>
+			</div>
+			<button type="submit" class="btn btn-primary">Submit</button>
+		</form>
+	</div>
+
+{% endblock %}
+
+
+

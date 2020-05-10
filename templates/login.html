@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block title %}
+LOGIN
+{% endblock %}
+
+{% block body %}
+{% if message %}
+<h1> Registration Success!</h1>
+{% endif %}
+<h1> Please Log In </h1>
+<form action="{{ url_for('login')}}" method="post">
+	<div class="form-group">
+		<input type="email" class="form-control" id="inpuEmail" aria-describedby="emailHelp" placeholder="Enter Email"name="email">
+		<small id="emailHelp" class="form-text text-muted">We'll never share your email with anyone else</small>
+	</div>
+	<div class="form-group">
+		<label for="inputPassword">Password</label>
+		<input type="password" class="form-control" id="inputPassword" placeholder="Password" name="password">
+	</div>
+	<button type="submit" class="btn btn-primary">Submit</button>
+</form>
+
+<div name="register"><a href="{{url_for('register')}}">Click here to Register</a></div>
+{% endblock %}

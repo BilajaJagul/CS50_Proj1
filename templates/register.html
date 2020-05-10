@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block title %}
+	Register 
+{% endblock %}
+
+{% block body %}
+<h1>Registration</h1>
+<form action="{{ url_for('registration') }}" method="post">
+	<div class="form-group">
+		<label for="input_email">Email Address</label>
+		<input type="email" class="form-control" id="input_email" aria-describedby="emailHelp" placeholder="Enter Valid Email" name="email">
+		<small id="emailHelp" class="form-text text-muted">Email ID Must be Unique</small>
+	</div>
+	<div class="form-group">
+		<label for="input_password">Password</label>
+                <input type="password" class="form-control" id="input_password" placeholder="Password" name="password">
+	</div>
+	<div class="form-group">
+	 <label for="input_username">Username</label>
+         <input type="" class="form-control" id="input_username" placeholder="Choose a Username" name="username">
+	</div>
+	<button type="submit" class="btn btn-primary">Submit</button>
+</form>
+{% endblock %}
