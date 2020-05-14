@@ -30,7 +30,7 @@
 			<tr>
 				<th scope="row">{{result.id}}</th>
 				<th scope="row">{{result.isbn}}</th>
-				<th scope="row"><a href="{{url_for('book',book_id=result.id)}}">{{result.title}}</a></th>
+				<th scope="row"><a href="{{url_for('review',book_id=result.id)}}">{{result.title}}</a></th>
 				<th scope="row">{{result.author}}</th>
 				<th scope="row">{{result.year}}</th>
 			</tr>

@@ -1,6 +1,6 @@
 #! /usr/bin/python
 
-from sqlalchemy import create_engine, func
+from sqlalchemy import create_engine, func, or_
 from sqlalchemy.orm import scoped_session, sessionmaker
 import os
 from flask import Flask, render_template, request,session, redirect, url_for, jsonify
@@ -8,15 +8,18 @@ from flask_session import Session
 import re
 import requests
 from models import *
+from flask_migrate import Migrate
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-db.init_app(app)
-
 app.config['SECRET_KEY'] = 'njenfjw38uei3jfi3wjfi3fu'
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = 'filesystem'
+
+
+db.init_app(app)
+migrate = Migrate(app, db)
 
 @app.route("/")
 def index():
@@ -34,7 +37,7 @@ def search():
     
     query = query.lower()
 
-    search_results = Books.query.filter(or_(func.lower(author).like('%{}%'.format(query)), func.lower(title).like('%{}%'.format(query)), func.lower(title).like('%{}%'.format(query)))).all()
+    search_results = Books.query.filter(or_(func.lower(Books.author).like('%{}%'.format(query)), func.lower(Books.isbn).like('%{}%'.format(query)), func.lower(Books.title).like('%{}%'.format(query)))).all()
 
     if search_results is None:
         return render_template("error.html",message="Invalid Search")
@@ -47,39 +50,36 @@ def search():
 #    search_results = db.execute("SELECT * FROM books WHERE LOWER(author) LIKE LOWER(:query) OR LOWER(title) LIKE LOWER(:query) or LOWER(isbn) LIKE LOWER(:query)",{"query":"%"+query+"%"}).fetchall() 
 #    return render_template("searcher.html",search_results=search_results)
 
-@app.route("/book/<int:book_id>")
 def book(book_id):
-    book = Books.query.get(book_id).all()
+    book = Books.query.get(book_id)
     if book is None:
         return render_template("error.html", message = "Book Not Found")
-    reviews = book.reviews
-
+    reviews = book.review
     #book = db.execute("SELECT * FROM books WHERE id = :book_id",{"book_id":book_id}).fetchone()
     #if book is None:
     #    return render_template("error.html",message="Book Not Found")
     #reviews = db.execute("SELECT * FROM reviews WHERE book_id=:book_id",{"book_id":book_id}).fetchall()
     #print(book)
-    res = requests.get("https://www.goodreads.com/book/review_counts.json", params={'key':'n5BiEwEWALWouvjZBJkj1Q', 'isbns':book[1]})
+    res = requests.get("https://www.goodreads.com/book/review_counts.json", params={'key':'n5BiEwEWALWouvjZBJkj1Q', 'isbns':book.isbn})
     if res.status_code != 200:
         raise Exception("Error connecting to Goodreads!")
     data = res.json()
     goodreads_data = {'work_rating_count':data["books"][0]["work_ratings_count"],'average_rating': data["books"][0]["average_rating"]}
     return render_template("book.html", book=book, review=reviews, goodreads=goodreads_data, user = session["user_id"])
 
-@app.route("/book/<int:book_id>", methods=["POST"])
+@app.route("/book/<int:book_id>", methods=["POST","GET"])
 def review(book_id):
     rate = request.form.get("rate")
     review = request.form.get("review")
 
-    if rate or review:
-        if session.get("id"):
+    if session.get("user_id"):
+        if rate or review:
             book_1 = Books.query.get(book_id)
-            book_1.add_review(rating, review, user_id)
+            book_1.add_review(rate, review, session["id"])
 #            db.execute("INSERT INTO reviews (rating, review, book_id, user_id) VALUES (:rate, :review,:book_id,:user_id)", {"rate":rate, "review":review,"book_id":book_id,"user_id":session["id"]})
-        else:
-            return render_template("error.html", message="Please Log In First")
+    else:
+        return render_template("error.html", message="Please Log In First")
     res = requests.get("https://www.goodreads.com/book/review_counts.json", params={'key':'n5BiEwEWALWouvjZBJkj1Q', 'isbns':''})
-    db.commit()
     return book(book_id)
 
 @app.route("/register")
@@ -96,19 +96,19 @@ def login():
     except ValueError:
         return render_template("error.html", message="Email or Password is missing")
     
-    user = Users.query.filter(Users.email_id == email).filter(Users.password == pwd).all()
-    if len(user) == 0:
+    user = Users.query.filter(Users.email_id == email).filter(Users.password == pwd).first()
+    if user is None:
         return render_template("error.html", message="Email or Password is incorrect")
     #print(user) 
     
-    user = print(user[0])
+    print(user)
 
     #if db.execute("SELECT * FROM users WHERE email_id=:email and password=:password",{"email":email, "password":pwd}).rowcount == 0:
      #   return render_template("error.html", message="Email or Password is incorrect")
     #user=db.execute("SELECT * FROM users WHERE email_id=:email and password=:password",{"email":email, "password":pwd}).fetchall()
     if session.get("id") is None:
-        session["id"] = user[0][0]
-        session["user_id"] = user[0][1]
+        session["id"] = user.id
+        session["user_id"] = user.user_name
     return render_template("searcher.html", user=session["user_id"])
 
 
@@ -136,7 +136,8 @@ def registration():
         username="Anon"
     if re.search("^[A-Za-z].*@.*\..*", email) is False:
         return render_template("error.html", message="Enter Valid Email")
-    unique = Users.query.filter_by(email_id=email).all()
+    unique = Users.query.filter_by(email_id=email).first()
+    print(unique)
     if unique is not None:
         return render_template("error.html", message="Email already in Use!")
 
@@ -155,18 +156,19 @@ def api(book_id):
     book = Books.query.get(book_id)
     #book = db.execute("SELECT * FROM books WHERE id = :book_id",{"book_id":book_id}).fetchone()
     if book is None:
-        return jsonify({"error":"Invalid flight_id"}), 422
-    reviews = db.execute("SELECT * FROM reviews WHERE book_id=:book_id",{"book_id":book_id}).fetchall()
+        return jsonify({"error":"Invalid book_id"}), 422
+    reviews = Reviews.query.filter_by(book_id=book_id).first()
+    #reviews = db.execute("SELECT * FROM reviews WHERE book_id=:book_id",{"book_id":book_id}).fetchall()
     #print(book)
-    res = requests.get("https://www.goodreads.com/book/review_counts.json", params={'key':'n5BiEwEWALWouvjZBJkj1Q', 'isbns':book[1]})
+    res = requests.get("https://www.goodreads.com/book/review_counts.json", params={'key':'n5BiEwEWALWouvjZBJkj1Q', 'isbns':book.isbn})
     if res.status_code != 200:
         raise Exception("Error connecting to Goodreads!")
     data = res.json()
     return jsonify({
-        "title":book[2],
-        "author":book[3],
-        "year":book[4],
-        "isbn":book[1],
+        "title":book.title,
+        "author":book.author,
+        "year":book.year,
+        "isbn":book.isbn,
         "work_rating_count":data["books"][0]["work_ratings_count"],
         "average_rating": data["books"][0]["average_rating"]})
 
